@@ -195,11 +195,15 @@
     appId: "1:541479451669:web:5356fe173c92be6404e21c"
   };
 
+  // ★ (예비 길) Google AI Studio에서 받은 Gemini API 키를 아래 "" 안에 넣으면,
+  //   Firebase가 안 될 때 이 키로 바로 읽어요. (AIza... 로 시작)
+  const GEMINI_KEY = "";
+
   const $ = id => document.getElementById(id);
   const LS_KEY = 'songsite_gemini_key';
   const LS_DRAFT = 'songsite_draft';
   const SUNO_URL = 'https://suno.com/create';
-  const MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+  const MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
   const MOODS = [
     { id:'happy',  name:'🎈 신나는 동요',   desc:'밝고 즐거운 어린이 노래', style:"happy bright children's song, cheerful, kids choir, Korean" },
@@ -222,7 +226,7 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
   let state = { lyrics:'', title:'', mood:'' };
 
   // ---------- 저장 ----------
-  function getKey(){ try{ return localStorage.getItem(LS_KEY) || ''; }catch(e){ return ''; } }
+  function getKey(){ if (GEMINI_KEY) return GEMINI_KEY; try{ return localStorage.getItem(LS_KEY) || ''; }catch(e){ return ''; } }
   function setKey(k){ try{ localStorage.setItem(LS_KEY, k); }catch(e){} }
   function saveDraft(){ try{ localStorage.setItem(LS_DRAFT, JSON.stringify(state)); }catch(e){} }
   function loadDraft(){ try{ return JSON.parse(localStorage.getItem(LS_DRAFT) || 'null'); }catch(e){ return null; } }
@@ -588,16 +592,23 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     for (const m of MODELS) {
       try {
         const model = fbAI.mod.getGenerativeModel(fbAI.ai, {
-          model: m, generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+          model: m, generationConfig: { responseMimeType: 'application/json' }
         });
         const res = await model.generateContent([PROMPT, { inlineData: { data: b64, mimeType: 'image/jpeg' } }]);
         return parseJson(res.response.text());
-      } catch (e) { last = e.message || String(e); }
+      } catch (e) { if (!last) last = m + ': ' + (e.message || String(e)); }
     }
     throw new Error('AI가 지금 바빠요. 잠시 뒤에 다시 해 볼까요? (' + last + ')');
   }
   async function askAI(b64){
-    if (hasFirebase()) return askFirebase(b64);
+    if (hasFirebase()) {
+      try { return await askFirebase(b64); }
+      catch (e) {
+        console.warn('Firebase 실패:', e);
+        if (getKey()) return askGemini(b64);   // 예비 길
+        throw e;
+      }
+    }
     return askGemini(b64);
   }
 
@@ -609,7 +620,7 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({
             contents:[{ parts:[ {text:PROMPT}, {inline_data:{mime_type:'image/jpeg', data:b64}} ] }],
-            generationConfig:{ temperature:0.2, responseMimeType:'application/json' }
+            generationConfig:{ responseMimeType:'application/json' }
           })
         });
         const j = await res.json().catch(() => ({}));
