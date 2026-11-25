@@ -113,7 +113,7 @@
         <button class="btn ghost thin" id="reRead">🤖 다시 읽기</button>
       </div>
     </div>
-    <div class="loading" id="loading">🤖 AI가 글씨를 읽고 있어요<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+    <div class="loading" id="loading">🤖 AI가 글씨를 읽고 있어요<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span><span id="loadSec"></span></div>
     <div class="err" id="err"></div>
     <div class="row" style="margin-top:12px">
       <button class="btn ghost" id="manual">✏️ 사진 없이 직접 쓸래요</button>
@@ -146,17 +146,15 @@
     <div class="guide">
       <b>Suno에서 이렇게 해요</b>
       <ol>
-        <li><b>로그인</b>(Sign in)이 나오면 → <b>Google로 계속하기</b> → <b>내 계정</b>을 눌러요.</li>
-        <li><b>Custom</b>(사용자 지정)을 눌러요.</li>
-        <li><b>가사(Lyrics)</b> 칸을 꾹 누르고 → <b>붙여넣기</b></li>
-        <li>이 화면으로 돌아와서 <b>🎨 분위기 복사</b> → <b>스타일(Styles)</b> 칸에 붙여넣기</li>
-        <li><b>제목(Title)</b>을 쓰고 → <b>Create</b>(만들기)를 눌러요!</li>
+        <li>Suno가 열리면 <b>Custom</b>(사용자 지정)을 눌러요.</li>
+        <li><b>가사(Lyrics)</b> 칸을 손가락으로 <b>꾹</b> 누르고 → <b>붙여넣기</b>를 눌러요.</li>
+        <li><b>Create</b>(만들기)를 누르면 끝! 🎉</li>
       </ol>
+      <p class="small" style="margin:8px 0 0">노래 분위기는 가사 맨 위 [ ] 안에 같이 들어가 있어서 따로 넣지 않아도 돼요.</p>
     </div>
     <div class="row" style="margin-top:14px">
-      <button class="btn ghost" id="cpLyrics">📋 가사 복사</button>
-      <button class="btn ghost" id="cpMood">🎨 분위기 복사</button>
-      <button class="btn ghost" id="cpTitle">🏷️ 제목 복사</button>
+      <button class="btn ghost" id="cpLyrics">📋 다시 복사하기</button>
+      <button class="btn ghost" id="cpTitle">🏷️ 제목 복사 (선택)</button>
     </div>
     <div class="row" style="margin-top:14px">
       <button class="btn ghost" id="reset">🔄 처음부터 다시 하기</button>
@@ -203,7 +201,7 @@
   const LS_KEY = 'songsite_gemini_key';
   const LS_DRAFT = 'songsite_draft';
   const SUNO_URL = 'https://suno.com/create';
-  const MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+  const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
   const MOODS = [
     { id:'happy',  name:'🎈 신나는 동요',   desc:'밝고 즐거운 어린이 노래', style:"happy bright children's song, cheerful, kids choir, Korean" },
@@ -263,6 +261,8 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     $('moods').appendChild(b);
   });
   const moodStyle = () => (MOODS.find(x => x.id === state.mood) || MOODS[0]).style;
+  // Suno 가사 칸 하나에 붙여 넣으면 되도록: 맨 위 [ ] 안에 분위기를 넣어요 (대괄호 안은 노래로 부르지 않아요)
+  const sunoText = () => '[' + moodStyle() + ']\n' + (state.lyrics || $('lyrics').value).trim();
 
   // ---------- 사진 → AI ----------
   $('shoot').onclick = () => $('file').click();
@@ -550,6 +550,9 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     }
     const cv = currentCv(); if (!cv) return;
     $('loading').style.display = 'block'; $('shoot').disabled = true; $('reRead').disabled = true;
+    const t0 = Date.now(), lt = $('loadSec');
+    clearInterval(runAI._t); lt.textContent = '';
+    runAI._t = setInterval(() => { lt.textContent = ' (' + Math.round((Date.now() - t0) / 1000) + '초)'; }, 1000);
     try {
       const b64 = canvasToB64(cv);
       const r = await askAI(b64);
@@ -562,11 +565,12 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     } catch (err) {
       showErr(err.message || '문제가 생겼어요. 다시 해 볼까요?');
     } finally {
+      clearInterval(runAI._t);
       $('loading').style.display = 'none'; $('shoot').disabled = false; $('reRead').disabled = false;
     }
   }
 
-  function canvasToB64(cv, max = 1600){
+  function canvasToB64(cv, max = 1280){
     let c = cv;
     const s = Math.min(1, max / Math.max(cv.width, cv.height));
     if (s < 1) {
@@ -594,7 +598,10 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
         const model = fbAI.mod.getGenerativeModel(fbAI.ai, {
           model: m, generationConfig: { responseMimeType: 'application/json' }
         });
-        const res = await model.generateContent([PROMPT, { inlineData: { data: b64, mimeType: 'image/jpeg' } }]);
+        const res = await Promise.race([
+          model.generateContent([PROMPT, { inlineData: { data: b64, mimeType: 'image/jpeg' } }]),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('시간 초과')), 40000))
+        ]);
         return parseJson(res.response.text());
       } catch (e) { if (!last) last = m + ': ' + (e.message || String(e)); }
     }
@@ -669,12 +676,11 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     return ok;
   }
   $('goSuno').onclick = () => {
-    copy(state.lyrics || $('lyrics').value);
-    toast('📋 가사를 복사했어요!');
+    copy(sunoText());
+    toast('📋 복사 완료! Suno 가사 칸에 붙여넣기만 하면 돼요');
     window.open(SUNO_URL, '_blank');
   };
-  $('cpLyrics').onclick = () => { copy(state.lyrics || $('lyrics').value); toast('📋 가사를 복사했어요'); };
-  $('cpMood').onclick   = () => { copy(moodStyle()); toast('🎨 분위기를 복사했어요'); };
+  $('cpLyrics').onclick = () => { copy(sunoText()); toast('📋 다시 복사했어요'); };
   $('cpTitle').onclick  = () => {
     const t = ($('title').value || '').trim();
     if (!t) { toast('제목을 먼저 써 주세요 🏷️'); return; }
