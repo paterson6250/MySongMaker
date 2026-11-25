@@ -67,6 +67,31 @@
     color:#fff;padding:14px 24px;border-radius:30px;font-size:20px;font-weight:700;transition:transform .25s;z-index:99}
   .toast.show{transform:translateX(-50%) translateY(0)}
   footer{text-align:center;padding:10px}
+  .homeBtn{position:fixed;top:12px;left:12px;z-index:50;border:none;border-radius:30px;padding:12px 18px;
+    font-size:19px;font-weight:800;background:#fff;color:var(--ink);box-shadow:0 3px 0 #ddd3c0,0 2px 10px rgba(0,0,0,.12);
+    font-family:inherit;cursor:pointer}
+  .homeBtn:active{transform:translateY(2px)}
+  header{padding-top:64px}
+  .helper{display:flex;gap:10px;align-items:flex-start;margin-top:18px}
+  .animal{flex:none;font-size:58px;line-height:1;animation:hop 1.6s ease-in-out infinite}
+  @keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .bubble{position:relative;flex:1;background:#eaf6ff;border:3px solid #9cc9ff;border-radius:22px;padding:14px 18px;
+    font-size:20px;line-height:1.6}
+  .bubble:before{content:"";position:absolute;left:-14px;top:22px;border:12px solid transparent;border-right-color:#9cc9ff;border-left:0}
+  .bubble:after{content:"";position:absolute;left:-9px;top:24px;border:10px solid transparent;border-right-color:#eaf6ff;border-left:0}
+  .bubble p{margin:6px 0}
+  .hl{color:#e8603f}
+  .demo{background:#fff;border-radius:16px;padding:12px 14px 14px;margin:10px 0;border:2px solid #d6e6f7}
+  .demoLabel{font-size:16px;font-weight:800;color:#555;margin-bottom:6px}
+  .demoBox{position:relative;border:2px solid #bbb;border-radius:12px;padding:46px 14px 14px;font-size:16px;color:#888;min-height:110px;background:#fafafa}
+  .demoText{opacity:0;animation:fill 4s infinite}
+  .demoPop{position:absolute;top:8px;left:20px;background:#333;color:#fff;font-size:17px;font-weight:800;padding:6px 14px;border-radius:10px;
+    opacity:0;animation:pop 4s infinite}
+  .finger{position:absolute;font-size:38px;left:60%;top:50px;animation:press 4s infinite}
+  @keyframes press{0%{transform:translate(0,0) scale(1)}10%,45%{transform:translate(0,0) scale(.85)}55%{transform:translate(-110px,-46px) scale(1)}
+    62%{transform:translate(-110px,-46px) scale(.85)}70%,100%{transform:translate(-110px,-46px) scale(1);opacity:0}}
+  @keyframes pop{0%,40%{opacity:0}45%,62%{opacity:1}68%,100%{opacity:0}}
+  @keyframes fill{0%,64%{opacity:0}70%,100%{opacity:1;color:#333}}
   #gear{background:none;border:none;font-size:15px;color:#b8ad98;cursor:pointer}
   #teacher{display:none}
   #teacher input{font-size:17px}
@@ -74,6 +99,7 @@
 </style>
 </head>
 <body>
+<button id="home" class="homeBtn">🏠 처음으로</button>
 <header>
   <h1>🎵 내 글로 노래 만들기</h1>
   <p>손으로 쓴 글을 찍으면, 노래 가사로 바꿔 줘요!</p>
@@ -143,6 +169,28 @@
   <section class="card off" id="c4">
     <div class="step"><div class="num">4</div><h2>Suno에서 노래 만들기 🎤</h2></div>
     <button class="btn big blue" id="goSuno">🚀 가사 복사하고 Suno 열기</button>
+
+    <div class="helper">
+      <div class="animal">🐰</div>
+      <div class="bubble">
+        <p>안녕! 나는 토끼야 🥕<br>
+        Suno에 가면 <b>가사 칸</b>을 손가락으로<br>
+        <b class="hl">2초 동안 꾸욱~</b> 눌러 봐!</p>
+        <p>그러면 아래 그림처럼<br><b class="hl">[붙여넣기]</b> 버튼이 뿅! 하고 나와.</p>
+
+        <div class="demo" aria-hidden="true">
+          <div class="demoLabel">가사 (Lyrics)</div>
+          <div class="demoBox">
+            <div class="demoPop">📋 붙여넣기</div>
+            <span class="demoText">[happy children's song]<br>나는 어제 친구들과…</span>
+            <span class="finger">👆</span>
+          </div>
+        </div>
+
+        <p>그 버튼을 <b class="hl">톡!</b> 누르면<br>맨 위 가사 칸에 내 노래 가사가 쏙 들어가! 🎶<br>
+        그다음 <b>Create</b>를 누르면 노래가 만들어져!</p>
+      </div>
+    </div>
     <div class="guide">
       <b>Suno에서 이렇게 해요</b>
       <ol>
@@ -686,14 +734,19 @@ JSON으로만 답하세요: {"read":"...","fixed":"..."}`;
     if (!t) { toast('제목을 먼저 써 주세요 🏷️'); return; }
     copy(t); toast('🏷️ 제목을 복사했어요');
   };
-  $('reset').onclick = () => {
+  function resetAll(){
     state = { lyrics:'', title:'', mood:'' }; saveDraft();
+    $('file').value = ''; $('preview').removeAttribute('src');
+    $('enhOn').checked = true; $('loading').style.display = 'none';
     $('lyrics').value = ''; $('title').value = ''; $('readBox').style.display = 'none';
     $('cropBox').style.display = 'none'; $('resultBox').style.display = 'none';
     srcCv = cropped = enhanced = null; $('shoot').textContent = '📷 사진 찍기';
     document.querySelectorAll('.mood').forEach(x => x.classList.remove('on'));
     showErr(''); unlock(1); window.scrollTo({top:0, behavior:'smooth'});
-  };
+    toast('🏠 처음으로 돌아왔어요!');
+  }
+  $('reset').onclick = resetAll;
+  $('home').onclick = resetAll;
 
   // ---------- 선생님 설정 ----------
   $('gear').onclick = () => { $('teacher').style.display = 'block'; $('keyIn').value = getKey(); $('teacher').scrollIntoView({behavior:'smooth'}); };
